@@ -15,8 +15,12 @@
 =================================================================
 """
 
+import os
+os.environ["USE_FOLIUM"] = "1"
+
 import streamlit as st
 import ee
+import geemap.foliumap as geemap
 from NDVI_analyzer_final_module import compare_before_after
 
 # =================================================================
@@ -34,6 +38,16 @@ st.set_page_config(
 # =================================================================
 
 ee.Initialize(project = 'knu-project-ndvi-2026')
+
+# =================================================================
+# NDVI 시각화 설정 (지도 색상)
+# =================================================================
+
+ndvi_vis_params = {
+    'min': 0,                                                            # NDVI 최솟값 : NDVI 0 이하는 첫 색인 흰색
+    'max': 1,                                                            # NDVI 최댓값 : NDVI 1은 마지막 색인 진초록
+    'palette': ['white', 'yellow', 'lightgreen', 'green', 'darkgreen']   # 흰색 -> 진초록 : 색상 그라데이션
+}
 
 # =================================================================
 # 헤더
@@ -133,6 +147,52 @@ if st.button("분석 시작", type = "primary", use_container_width = True):
 
     이는 **약 {abs(result['percent_change']):.1f}%의 식생 감소**를 의미하며,
     산불로 인한 식생 피해를 정량적으로 보여줍니다.
+    """)
+
+    # =============================================================
+    # 지도 시각화
+    # =============================================================
+
+    st.divider()
+    st.markdown("### 🗺️ 산불 전/후 NDVI 비교")
+
+    st.caption("우측 상단 레이어 아이콘으로 산불 전/후 지도를 토글할 수 있습니다.")
+
+    # 지도 생성 (함지산 중심, 줌 레벨 14)
+    Map = geemap.Map(
+        center = [35.9145, 128.5774],
+        zoom = 14
+    )
+
+    # 산불 전 NDVI 레이어 추가
+    Map.addLayer(
+        result['ndvi_before_image'],
+        ndvi_vis_params,
+        f'산불 전 NDVI ({result["date_before"]})'
+    )
+
+    # 산불 후 NDVI 레이어 추가
+    Map.addLayer(
+        result['ndvi_after_image'],
+        ndvi_vis_params,
+        f'산불 후 NDVI ({result["date_after"]})'
+    )
+
+    # 분석 영역 표시 (빨간 원)
+    Map.addLayer(
+        area,
+        {'color': 'red'},
+        '분석영역 (반경 800m)'
+    )
+
+    # Streamlit에 지도 표시
+    Map.to_streamlit(height = 500)
+
+    # NDVI 색상 범례 설명
+    st.caption("""
+    🎨 **색상 해석**:
+    흰색/노랑 (NDVI 낮음, 식생 적음) -> 진초록 (NDVI 높음, 식생 풍부)
+    🔴 빨간 원: 평균 NDVI를 계산한 분석 영역 시각화
     """)
 
     # 상세 데이터 (펼침)
